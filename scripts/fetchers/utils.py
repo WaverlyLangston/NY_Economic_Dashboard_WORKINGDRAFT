@@ -57,7 +57,11 @@ def bls_to_df(raw_results, series_name_map):
             if period.startswith("M") and period != "M13":   # M13 = annual avg
                 month = period[1:]
                 time_str = f"{rec['year']}-{month}"
-                rows.append({"time": time_str, "series": name, "value": float(rec["value"])})
+                try:
+                    val = float(rec["value"])
+                except (ValueError, TypeError):
+                    continue
+                rows.append({"time": time_str, "series": name, "value": val})
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
