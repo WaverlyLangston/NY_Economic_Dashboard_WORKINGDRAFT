@@ -1,10 +1,5 @@
 """
-fetch_all_data.py
-Orchestrates all data fetchers in the correct order.
-Run locally or via GitHub Actions daily.
-
-Usage:
-    python scripts/fetch_all_data.py
+Runs all data fetchers in the correct order.
 
 Environment variables required:
     CENSUS_API_KEY, BLS_API_KEY, BEA_API_KEY
