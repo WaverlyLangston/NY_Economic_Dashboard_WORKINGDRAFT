@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import pandas as pd
 import numpy as np
-from scripts.fetchers.utils import safe_get, save_json
+from scripts.fetchers.utils import safe_get, save_json, load_json_safe
 from config import (BEA_BASE_URL, BEA_API_KEY, PEER_STATES_BEA,
                     NY_GEO_BEA, OUTPUT_FILES)
 
@@ -141,10 +141,19 @@ def fetch():
     ny_q   = fetch_ny_industry_gdp()
     ny_ann = fetch_ny_annual_industry()
 
-    save_json(peer, OUTPUT_FILES["bea_gdp"])
-    save_json({"quarterly_by_industry": ny_q, "annual_by_industry": ny_ann},
-              OUTPUT_FILES["bea_gdp_industry"])
-    print("  BEA: all GDP data saved.")
+    if peer:
+        save_json(peer, OUTPUT_FILES["bea_gdp"])
+    else:
+        peer = load_json_safe(OUTPUT_FILES["bea_gdp"]) or []
+        print("  BEA: no peer GDP data — keeping existing data")
+
+    if ny_q or ny_ann:
+        save_json({"quarterly_by_industry": ny_q, "annual_by_industry": ny_ann},
+                  OUTPUT_FILES["bea_gdp_industry"])
+    else:
+        print("  BEA: no industry GDP data — keeping existing data")
+
+    print("  BEA: GDP data complete.")
     return peer
 
 if __name__ == "__main__":

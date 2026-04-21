@@ -79,5 +79,15 @@ def load_json(path):
     with open(path) as f:
         return json.load(f)
 
+def load_json_safe(path):
+    """Return existing JSON data at path, or None if the file doesn't exist."""
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
 def now_str():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")

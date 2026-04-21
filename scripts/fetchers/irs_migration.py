@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 import requests
 from io import StringIO
-from scripts.fetchers.utils import save_json
+from scripts.fetchers.utils import save_json, load_json_safe
 from config import IRS_BASE_URL, IRS_YEARS, NY_FIPS_IRS, OUTPUT_FILES
 
 def _download_flow(year_code, direction):
@@ -112,6 +112,11 @@ def fetch():
                         "top_inflow":  top_in.to_dict(orient="records"),
                         "top_outflow": top_out.to_dict(orient="records"),
                     }
+
+    if not annual_net:
+        print("  IRS migration: no data downloaded — keeping existing data")
+        existing = load_json_safe(OUTPUT_FILES["irs_migration"])
+        return existing if existing is not None else {"annual_net": [], "top_flows": []}
 
     result = {"annual_net": annual_net, "top_flows": top_flows}
     save_json(result, OUTPUT_FILES["irs_migration"])

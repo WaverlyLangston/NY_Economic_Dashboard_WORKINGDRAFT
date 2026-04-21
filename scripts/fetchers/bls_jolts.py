@@ -9,13 +9,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__),"..",".."))
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from scripts.fetchers.utils import bls_post, bls_to_df, save_json
+from scripts.fetchers.utils import bls_post, bls_to_df, save_json, load_json_safe
 from config import BLS_API_KEY, JOLTS_SERIES, OUTPUT_FILES
 
 START_YEAR = 2016
 END_YEAR   = datetime.now().year
 
-RATE_COLS = [c for c in JOLTS_SERIES.values() if "Rate" in c or "Ratio" in c]
+RATE_COLS  = [c for c in JOLTS_SERIES.values() if "Rate" in c]          # percent → decimal
+RATIO_COLS = [c for c in JOLTS_SERIES.values() if "Ratio" in c]         # already a ratio, no conversion
 LEVEL_COLS = [c for c in JOLTS_SERIES.values() if "Level" in c]
 
 def fetch():
@@ -25,9 +26,9 @@ def fetch():
     df  = bls_to_df(raw, JOLTS_SERIES)
 
     if df.empty:
-        print("  JOLTS: no data returned — NY state JOLTS may be limited; saving empty.")
-        save_json({"monthly": [], "note": "NY state JOLTS data not available for this period."}, OUTPUT_FILES["bls_jolts"])
-        return {}
+        print("  JOLTS: no data returned — keeping existing data")
+        existing = load_json_safe(OUTPUT_FILES["bls_jolts"])
+        return existing if existing is not None else {}
 
     wide = df.pivot_table(index="time", columns="series", values="value", aggfunc="first")
     wide.columns.name = None

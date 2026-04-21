@@ -23,12 +23,12 @@ def run_step(name, fn, *args, **kwargs):
         result = fn(*args, **kwargs)
         elapsed = time.time() - t0
         print(f"  ✓ {name} completed in {elapsed:.1f}s")
-        return result
+        return result, True
     except Exception as e:
         import traceback
         print(f"  ✗ {name} FAILED: {e}")
         traceback.print_exc()
-        return None
+        return None, False
 
 def main():
     print(f"\n{'='*60}")
@@ -40,36 +40,64 @@ def main():
     from scripts.fetchers import bls_laus, bls_ces, bls_jolts
     from scripts.fetchers import bea_gdp, irs_migration
 
+    failed = []
+
     # 1. Population estimates first (needed by BFS for per-capita)
-    pop_df = run_step("Census PEP (Population)", census_pep.fetch)
+    pop_df, pep_ok = run_step("Census PEP (Population)", census_pep.fetch)
+    if not pep_ok:
+        failed.append("Census PEP")
 
     # 2. Business Formation Statistics (uses pop_df for per capita)
-    run_step("Census BFS (Business Formation)", census_bfs.fetch, population_df=pop_df)
+    #    Skip if PEP failed to preserve existing per-capita values in bfs.json
+    if pep_ok:
+        _, bfs_ok = run_step("Census BFS (Business Formation)", census_bfs.fetch, population_df=pop_df)
+        if not bfs_ok:
+            failed.append("Census BFS")
+    else:
+        print("\n  Skipping Census BFS: PEP dependency unavailable — keeping existing data")
+        failed.append("Census BFS")
 
     # 3. ACS demographics, housing, income, poverty
-    run_step("Census ACS (Demographics/Housing/Income/Poverty)", census_acs.fetch)
+    _, acs_ok = run_step("Census ACS (Demographics/Housing/Income/Poverty)", census_acs.fetch)
+    if not acs_ok:
+        failed.append("Census ACS")
 
     # 4. BLS labor force
-    run_step("BLS LAUS (Labor Force)", bls_laus.fetch)
+    _, laus_ok = run_step("BLS LAUS (Labor Force)", bls_laus.fetch)
+    if not laus_ok:
+        failed.append("BLS LAUS")
 
     # 5. BLS employment by industry
-    run_step("BLS CES (Employment by Industry)", bls_ces.fetch)
+    _, ces_ok = run_step("BLS CES (Employment by Industry)", bls_ces.fetch)
+    if not ces_ok:
+        failed.append("BLS CES")
 
     # 6. BLS job openings
-    run_step("BLS JOLTS (Job Openings)", bls_jolts.fetch)
+    _, jolts_ok = run_step("BLS JOLTS (Job Openings)", bls_jolts.fetch)
+    if not jolts_ok:
+        failed.append("BLS JOLTS")
 
     # 7. BEA GDP (most API calls — keep at end, rate limit cautious)
-    run_step("BEA GDP (State GDP)", bea_gdp.fetch)
+    _, bea_ok = run_step("BEA GDP (State GDP)", bea_gdp.fetch)
+    if not bea_ok:
+        failed.append("BEA GDP")
 
     # 8. IRS Migration
-    run_step("IRS Migration", irs_migration.fetch)
+    _, irs_ok = run_step("IRS Migration", irs_migration.fetch)
+    if not irs_ok:
+        failed.append("IRS Migration")
 
-    # 9. Write metadata
-    meta = {
-        "last_updated": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "last_updated_display": datetime.utcnow().strftime("%B %d, %Y"),
-    }
-    save_json(meta, OUTPUT_FILES["metadata"])
+    # 9. Write metadata only if all sources succeeded; otherwise preserve existing timestamps
+    if not failed:
+        meta = {
+            "last_updated": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "last_updated_display": datetime.utcnow().strftime("%B %d, %Y"),
+        }
+        save_json(meta, OUTPUT_FILES["metadata"])
+        print("\n  All sources updated — metadata timestamp refreshed.")
+    else:
+        print(f"\n  ⚠ Failed sources: {', '.join(failed)}")
+        print("  Metadata timestamp NOT updated — existing dates reflect cached data.")
 
     print(f"\n{'='*60}")
     print("  All data fetching complete.")

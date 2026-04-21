@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__),"..",".."))
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from scripts.fetchers.utils import bls_post, bls_to_df, save_json
+from scripts.fetchers.utils import bls_post, bls_to_df, save_json, load_json_safe
 from config import BLS_API_KEY, LAUS_SERIES, OUTPUT_FILES
 
 START_YEAR = 2016
@@ -23,9 +23,9 @@ def fetch():
     df  = bls_to_df(raw, LAUS_SERIES)
 
     if df.empty:
-        print("  LAUS: no data returned")
-        save_json([], OUTPUT_FILES["bls_laus"])
-        return []
+        print("  LAUS: no data returned — keeping existing data")
+        existing = load_json_safe(OUTPUT_FILES["bls_laus"])
+        return existing if existing is not None else []
 
     # Pivot to wide format for easy charting
     wide = df.pivot_table(index="time", columns="series", values="value", aggfunc="first")

@@ -154,7 +154,7 @@ def chart_gdp_peer():
     times = df["time"].tolist()
     src   = "U.S. Bureau of Economic Analysis, Real GDP (SQGDP9)"
 
-    state_order = ["New York", "New Jersey", "Massachusetts", "Connecticut", "United States"]
+    state_order = ["New York", "New Jersey", "Massachusetts", "Connecticut"]
 
     fig = go.Figure()
     for state in state_order:
@@ -491,26 +491,56 @@ def chart_ces():
     ref_date = data.get("reference_date",""); src = "U.S. Bureau of Labor Statistics, CES"
     if monthly.empty: return "<p>CES data unavailable.</p>","",""
     monthly["time"] = pd.to_datetime(monthly["time"])
-    ind_idx = [c for c in monthly.columns if c.endswith(" Index")
-               and c not in ("Total Nonfarm Index","Total Private Index","Government Index")]
+
+    # ── Levels chart: Total Nonfarm default, industries legendonly ─────────────
+    total_col  = "Total Nonfarm"
+    level_cols = [c for c in monthly.columns
+                  if c not in {"time"} and not c.endswith(" Index")]
+
+    total_series = monthly[total_col] if total_col in monthly.columns else None
 
     fig_a = go.Figure()
-    for i, col in enumerate(ind_idx):
-        lbl = col.replace(" Index","")
-        fig_a.add_trace(go.Scatter(x=monthly["time"], y=monthly[col], name=lbl,
-            line=dict(color=IND_PAL[i%len(IND_PAL)], width=1.8),
-            hovertemplate=f"{lbl}: %{{y:.1%}}<extra></extra>"))
-    fig_a.add_hline(y=0, line_dash="dot", line_color=BORDER, line_width=1)
-    la = L("New York Jobs Index by Industry", h=520, bm=145)
-    la["legend"] = dict(orientation="h", yanchor="top", y=-0.20,
-                        xanchor="center", x=0.5,
-                        font=dict(size=9, color=TEXT_MID),
-                        bgcolor="rgba(0,0,0,0)", borderwidth=0,
-                        entrywidth=175, entrywidthmode="pixels")
+    if total_series is not None:
+        fig_a.add_trace(go.Scatter(
+            x=monthly["time"], y=total_series,
+            name="Total Nonfarm",
+            visible=True,
+            line=dict(color=NY_RUST, width=2.5),
+            hovertemplate="Total Nonfarm: %{y:,.0f}K (100%)<extra></extra>",
+        ))
+
+    other_level_cols = [c for c in level_cols if c != total_col]
+    for i, col in enumerate(other_level_cols):
+        if col not in monthly.columns:
+            continue
+        if total_series is not None:
+            pct  = (monthly[col] / total_series * 100).tolist()
+            cdata = [[p] for p in pct]
+            ht = f"{col}: %{{y:,.0f}}K (%{{customdata[0]:.1f}}%)<extra></extra>"
+        else:
+            cdata = None
+            ht = f"{col}: %{{y:,.0f}}K<extra></extra>"
+        fig_a.add_trace(go.Scatter(
+            x=monthly["time"], y=monthly[col],
+            name=col, visible="legendonly",
+            line=dict(color=IND_PAL[i % len(IND_PAL)], width=1.8),
+            customdata=cdata,
+            hovertemplate=ht,
+        ))
+
+    la = L("New York Employment by Industry", h=520, bm=145)
+    la["legend"] = dict(
+        orientation="h", yanchor="top", y=-0.20,
+        xanchor="center", x=0.5,
+        font=dict(size=9, color=TEXT_MID),
+        bgcolor="rgba(0,0,0,0)", borderwidth=0,
+        entrywidth=175, entrywidthmode="pixels",
+        itemclick="toggle", itemdoubleclick="toggleothers",
+    )
     la["xaxis"]["title"]      = ax_title("Monthly, Seasonally Adjusted")
-    la["yaxis"]["tickformat"]  = ".0%"
-    la["yaxis"]["title"]       = ax_title("Change from Base")
-    la["annotations"]          = [sa(f"Source: {src} (base: {ref_date})", -0.30)]
+    la["yaxis"]["tickformat"] = ",.0f"
+    la["yaxis"]["title"]      = ax_title("Employment (Thousands)")
+    la["annotations"]         = [sa(f"Source: {src}", -0.30)]
     fig_a.update_layout(**la)
 
     fig_b = go.Figure()

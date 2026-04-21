@@ -61,8 +61,10 @@ def fetch(population_df=None):
         us_pop = pop.loc["United States"] if "United States" in pop.index else None
         if ny_pop is not None:
             wide["NY_pop"] = wide["year"].map(lambda y: float(str(ny_pop.get(y, np.nan)).replace(",","")))
+            wide["NY_pop"] = wide["NY_pop"].ffill()  # carry forward most recent year when newer data is unavailable
         if us_pop is not None:
             wide["US_pop"] = wide["year"].map(lambda y: float(str(us_pop.get(y, np.nan)).replace(",","")))
+            wide["US_pop"] = wide["US_pop"].ffill()
         wide.drop(columns=["year"], inplace=True)
 
         for app_type in ["Business Applications", "High Propensity Business Applications"]:
