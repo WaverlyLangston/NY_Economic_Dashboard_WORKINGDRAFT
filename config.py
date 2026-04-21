@@ -1,16 +1,11 @@
-"""
-config.py
-Central configuration for NY Economic Dashboard.
-All API keys are loaded from environment variables.
-"""
+
 import os
 
-# ─── API KEYS (set as GitHub Actions secrets or local env vars) ───────────────
 CENSUS_API_KEY = os.environ.get("CENSUS_API_KEY", "")
 BLS_API_KEY    = os.environ.get("BLS_API_KEY", "")
 BEA_API_KEY    = os.environ.get("BEA_API_KEY", "")
 
-# ─── STATE IDENTIFIERS ────────────────────────────────────────────────────────
+# State FIS Codes
 NY_FIPS      = "36"
 NY_ABBREV    = "NY"
 NY_GEO_BEA   = "36000"
@@ -24,7 +19,6 @@ PEER_STATES_BEA = {
     "00000": "United States",
 }
 
-# ─── BEA ─────────────────────────────────────────────────────────────────────
 BEA_BASE_URL = "https://apps.bea.gov/api/data"
 BEA_TABLES = {
     "quarterly_real": "SQGDP9",
@@ -58,10 +52,8 @@ BEA_INDUSTRY_CODES = {
     "37": "State and local",
 }
 
-# ─── BLS BASE ─────────────────────────────────────────────────────────────────
 BLS_BASE_URL = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
 
-# LAUS — New York State + National
 LAUS_SERIES = {
     "LASST360000000000003": "NY Unemployment Rate",
     "LASST360000000000004": "NY Unemployment Level",
@@ -74,7 +66,6 @@ LAUS_SERIES = {
     "LNS12300000":          "U.S. Employment-Population Ratio",
 }
 
-# CES — New York State supersectors
 CES_SERIES = {
     "SMS36000000000000001": "Total Nonfarm",
     "SMS36000000500000001": "Total Private",
@@ -90,7 +81,6 @@ CES_SERIES = {
     "SMS36000009000000001": "Government",
 }
 
-# JOLTS — New York State + National
 JOLTS_SERIES = {
     "JTS000000360000000JOL": "NY Job Openings Level",
     "JTS000000360000000JOR": "NY Job Openings Rate",
@@ -111,7 +101,6 @@ JOLTS_SERIES = {
     "JTS000000000000000UOR": "U.S. Unemployed per Job Opening Ratio",
 }
 
-# ─── CENSUS BASE ──────────────────────────────────────────────────────────────
 CENSUS_BASE_URL = "https://api.census.gov/data"
 BFS_CSV_URL     = "https://www.census.gov/econ/bfs/csv/bfs_monthly.csv"
 
@@ -121,7 +110,6 @@ PEP_URLS = {
     "2020_2023": "https://www2.census.gov/programs-surveys/popest/tables/2020-2023/state/totals/NST-EST2023-POP.xlsx",
 }
 
-# ─── IRS MIGRATION ────────────────────────────────────────────────────────────
 IRS_BASE_URL = "https://www.irs.gov/pub/irs-soi"
 IRS_YEARS = [
     ("1314", "2013-2014"),
@@ -136,7 +124,6 @@ IRS_YEARS = [
 ]
 NY_FIPS_IRS = 36
 
-# ─── OUTPUT PATHS ─────────────────────────────────────────────────────────────
 DATA_DIR = "data"
 DOCS_DIR = "docs"
 OUTPUT_FILES = {
