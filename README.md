@@ -18,32 +18,6 @@ An interactive economic dashboard for New York State, published to GitHub Pages 
 | Migration | IRS Statistics of Income | Direct CSV download |
 | Poverty / Income | U.S. Census Bureau, ACS | Census API |
 
-## Repository Structure
-
-```
-ny-economic-dashboard/
-├── .github/workflows/
-│   └── refresh-data.yml      # Daily GitHub Actions job
-├── scripts/
-│   ├── fetch_all_data.py     # Orchestrator: runs all fetchers
-│   ├── build_page.py         # Builds docs/index.html from JSON
-│   └── fetchers/
-│       ├── bea_gdp.py
-│       ├── bls_ces.py
-│       ├── bls_jolts.py
-│       ├── bls_laus.py
-│       ├── census_acs.py
-│       ├── census_bfs.py
-│       ├── census_pep.py
-│       ├── irs_migration.py
-│       └── utils.py
-├── data/                     # Pre-fetched JSON files (auto-updated)
-├── docs/
-│   └── index.html            # Generated dashboard page
-├── config.py                 # All series IDs, API settings
-├── requirements.txt
-└── README.md
-```
 
 ## Data Refresh
 Data refreshes automatically every day at 4:00AM via GitHub Actions.
