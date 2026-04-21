@@ -20,7 +20,7 @@ PEER_STATES_BEA = {
     "36000": "New York",
     "25000": "Massachusetts",
     "34000": "New Jersey",
-    "44000": "Rhode Island",
+    "09000": "Connecticut",
     "00000": "United States",
 }
 

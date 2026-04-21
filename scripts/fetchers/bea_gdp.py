@@ -85,8 +85,8 @@ def fetch_ny_industry_gdp():
     df["time"] = df["TimePeriod"].apply(parse_quarter)
     df = df.dropna(subset=["time", "DataValue"])
 
-    # Skip aggregates and very noisy rows
-    skip = {"All industry total", "Private industries"}
+    # Skip pure aggregates (keep "All industry total" for % of total computation)
+    skip = {"Private industries"}
     result = {}
     for desc, grp in df.groupby("Description"):
         if desc.strip() in skip:

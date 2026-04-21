@@ -27,7 +27,7 @@ IND_PAL = [NY_RUST, US_SAGE, TAN, DUSTY, WARM_BRN,
            DEEP_SAGE, SAND, STEEL, MUT_RED, OLIVE, "#9B8B6B", "#7A9B8A"]
 
 PEER_COL = {"New York": NY_RUST, "Massachusetts": DUSTY,
-            "New Jersey": TAN, "Rhode Island": US_SAGE, "United States": WARM_BRN}
+            "New Jersey": TAN, "Connecticut": US_SAGE, "United States": WARM_BRN}
 
 CFG = {"displayModeBar": True, "responsive": True,
        "modeBarButtonsToRemove": ["select2d","lasso2d"], "displaylogo": False}
@@ -146,33 +146,61 @@ def _index_to(series, ref_idx):
     return None if (pd.isna(ref) or ref == 0) else (series / ref) - 1.0
 
 def chart_gdp_peer():
-    """Peer-state GDP with JS-powered base-year/quarter selector."""
+    """Peer-state real GDP levels — NY, NJ, MA, CT, US."""
     data = load("bea_gdp")
     if not data: return "<p>GDP data unavailable.</p>"
 
     df    = pd.DataFrame(data)
-    peers = [c for c in df.columns if c != "time"]
-    times = df["time"].tolist()          # list of strings like "2018Q1"
-    src   = "U.S. Bureau of Economic Analysis, Real GDP"
+    times = df["time"].tolist()
+    src   = "U.S. Bureau of Economic Analysis, Real GDP (SQGDP9)"
 
-    # Build raw series dict for JS
+    state_order = ["New York", "New Jersey", "Massachusetts", "Connecticut", "United States"]
+
+    fig = go.Figure()
+    for state in state_order:
+        if state not in df.columns:
+            continue
+        vals = pd.to_numeric(df[state], errors="coerce").tolist()
+        fig.add_trace(go.Scatter(
+            x=times, y=vals, name=state,
+            line=dict(color=PEER_COL.get(state, TEXT_LIGHT),
+                      width=2.5 if state == "New York" else 1.8),
+            hovertemplate=f"{state}: $%{{y:,.0f}}M<extra></extra>",
+        ))
+
+    lay = L("Real GDP by State", h=520, bm=110)
+    lay["xaxis"]["title"]      = ax_title("Quarterly")
+    lay["yaxis"]["title"]      = ax_title("Real GDP (Millions of Chained 2017 $)")
+    lay["yaxis"]["tickformat"] = ",.0f"
+    lay["annotations"]         = [sa(f"Source: {src}", -0.22)]
+    fig.update_layout(**lay)
+    return to_html(fig, "gdp_peer")
+
+def chart_gdp_industry_growth():
+    """NY vs US GDP index with JS-powered base-year/quarter selector."""
+    data = load("bea_gdp")
+    if not data: return "<p>GDP data unavailable.</p>"
+
+    df     = pd.DataFrame(data)
+    times  = df["time"].tolist()
+    states = ["New York", "United States"]
+    src    = "U.S. Bureau of Economic Analysis, Real GDP (SQGDP9)"
+
     raw_series = {}
-    for state in peers:
+    for state in states:
         if state in df.columns:
             raw_series[state] = pd.to_numeric(df[state], errors="coerce").tolist()
 
-    # Default: index to Q1 2019 = find index of "2019Q1"
     def find_idx(q_str):
         try: return times.index(q_str)
-        except ValueError:
-            # fallback: earliest available
-            return 0
+        except ValueError: return 0
 
     default_ref = find_idx("2019Q1")
+    state_colors = {"New York": NY_RUST, "United States": US_SAGE}
 
     def make_traces(ref_idx):
         traces = []
-        for state in peers:
+        for state in states:
             if state not in raw_series: continue
             vals = pd.Series(raw_series[state])
             if ref_idx >= len(vals): continue
@@ -181,219 +209,180 @@ def chart_gdp_peer():
             indexed = ((vals / ref) - 1.0).tolist()
             traces.append(go.Scatter(
                 x=times, y=indexed, name=state,
-                line=dict(color=PEER_COLORS.get(state, TEXT_LIGHT),
-                          width=2.5 if state=="New York" else 1.8),
+                line=dict(color=state_colors.get(state, TEXT_LIGHT),
+                          width=2.5 if state == "New York" else 1.8),
                 hovertemplate=f"{state}: %{{y:.1%}}<extra></extra>",
-                customdata=[ref_idx]*len(times),
             ))
         return traces
 
-    PEER_COLORS = PEER_COL
     fig = go.Figure(data=make_traces(default_ref))
     fig.add_hline(y=0, line_dash="dot", line_color=BORDER, line_width=1)
 
-    lay = L("GDP Index by State", h=520, bm=110)
-    lay["xaxis"]["title"]     = ax_title("Quarterly")
+    lay = L("GDP Index — New York vs. United States", h=480, bm=110)
+    lay["xaxis"]["title"]      = ax_title("Quarterly")
     lay["yaxis"]["tickformat"] = ".0%"
-    lay["yaxis"]["title"]     = ax_title("Change from Base Period")
-    lay["annotations"]        = [sa(f"Source: {src}", -0.22)]
+    lay["yaxis"]["title"]      = ax_title("Change from Base Period")
+    lay["annotations"]         = [sa(f"Source: {src}", -0.22)]
     fig.update_layout(**lay)
 
-    # Serialise raw data and times for JS reindexing
-    raw_json  = json.dumps(raw_series)
+    raw_json   = json.dumps(raw_series)
     times_json = json.dumps(times)
-
-    # Available quarters in the data
     available_quarters = sorted(set(times))
-    years   = sorted(set(q[:4] for q in available_quarters))
+    years    = sorted(set(q[:4] for q in available_quarters))
     quarters = ["Q1","Q2","Q3","Q4"]
 
     yr_opts  = "\n".join(f'<option value="{y}" {"selected" if y=="2019" else ""}>{y}</option>' for y in years)
     qtr_opts = "\n".join(f'<option value="{q}" {"selected" if q=="Q1" else ""}>{q}</option>' for q in quarters)
 
-    chart_html = to_html(fig, "gdp_peer")
+    chart_html = to_html(fig, "gdp_ny_us_index")
 
     widget = f"""
-<div class="index-selector" id="gdp_peer_controls">
+<div class="index-selector" id="gdp_ny_us_controls">
   <span class="index-label">Indexed to:</span>
-  <select class="index-select" id="gdp_peer_year">{yr_opts}</select>
-  <select class="index-select" id="gdp_peer_qtr">{qtr_opts}</select>
+  <select class="index-select" id="gdp_ny_us_year">{yr_opts}</select>
+  <select class="index-select" id="gdp_ny_us_qtr">{qtr_opts}</select>
 </div>
 {chart_html}
 <script>
 (function(){{
   var raw    = {raw_json};
   var times  = {times_json};
-  var peers  = {json.dumps(peers)};
-  var colors = {json.dumps(PEER_COL)};
-  var defaultColor = '{TEXT_LIGHT}';
+  var states = {json.dumps(states)};
 
   function reindex(refStr) {{
     var refIdx = times.indexOf(refStr);
     if (refIdx < 0) refIdx = 0;
-    var updates = {{ x:[], y:[], name:[] }};
-    var traceUpdates = [];
-    peers.forEach(function(state) {{
-      if (!raw[state]) return;
-      var vals = raw[state];
-      var ref = vals[refIdx];
-      if (!ref || isNaN(ref)) {{ traceUpdates.push({{y: vals.map(function(){{return null;}})}}); return; }}
-      var indexed = vals.map(function(v){{ return (v/ref)-1; }});
-      traceUpdates.push({{y: [indexed]}});
-    }});
-    var el = document.getElementById('gdp_peer');
-    if (el) {{
-      var updateData = {{}};
-      traceUpdates.forEach(function(u,i){{ updateData[i+'.y'] = u.y[0]; }});
-      var traces = traceUpdates.map(function(u,i){{return i;}});
-      var yArrays = traceUpdates.map(function(u){{return u.y[0];}});
-      Plotly.restyle('gdp_peer', {{y: yArrays}}, traces);
-    }}
-  }}
-
-  function update() {{
-    var yr  = document.getElementById('gdp_peer_year').value;
-    var qtr = document.getElementById('gdp_peer_qtr').value;
-    reindex(yr + qtr);
-  }}
-
-  document.getElementById('gdp_peer_year').addEventListener('change', update);
-  document.getElementById('gdp_peer_qtr').addEventListener('change', update);
-}})();
-</script>"""
-    return widget
-
-def chart_gdp_industry_growth():
-    data = load("bea_gdp_industry")
-    if not data: return "<p>GDP industry data unavailable.</p>"
-    qtr = data.get("quarterly_by_industry", {})
-    if not qtr: return "<p>GDP quarterly industry data unavailable.</p>"
-
-    skip = {"All industry total","Private industries","Government",
-            "Administrative and support and waste management",
-            "Management of companies and enterprises"}
-    industries = [k for k in qtr.keys() if k not in skip]
-    src = "U.S. Bureau of Economic Analysis, Real GDP"
-
-    # Gather all time labels
-    all_times = []
-    for ind in industries:
-        if qtr[ind]["times"]: all_times = qtr[ind]["times"]; break
-    available_quarters = sorted(set(all_times))
-    years    = sorted(set(q[:4] for q in available_quarters))
-    quarters = ["Q1","Q2","Q3","Q4"]
-
-    default_ref_str = "2019Q1"
-    def ref_idx_for(ref_str, times_list):
-        try: return times_list.index(ref_str)
-        except ValueError: return 0
-
-    # Build initial traces at default base
-    fig = go.Figure()
-    for i, ind in enumerate(industries):
-        sd   = qtr[ind]
-        vals = pd.Series(sd["values"])
-        times_list = sd["times"]
-        ri   = ref_idx_for(default_ref_str, times_list)
-        ref  = vals.iloc[ri] if ri < len(vals) else np.nan
-        if pd.isna(ref) or ref == 0: continue
-        fig.add_trace(go.Scatter(
-            x=times_list, y=((vals/ref)-1.0).tolist(),
-            name=ind, line=dict(color=IND_PAL[i % len(IND_PAL)], width=1.8),
-            hovertemplate=f"{ind}: %{{y:.1%}}<extra></extra>"))
-    fig.add_hline(y=0, line_dash="dot", line_color=BORDER, line_width=1)
-
-    lay = L("New York Industry GDP Growth", h=520, bm=140)
-    lay["legend"] = dict(orientation="h", yanchor="top", y=-0.18,
-                         xanchor="center", x=0.5,
-                         font=dict(size=9, color=TEXT_MID),
-                         bgcolor="rgba(0,0,0,0)", borderwidth=0,
-                         entrywidth=175, entrywidthmode="pixels")
-    lay["xaxis"]["title"]     = ax_title("Quarterly")
-    lay["yaxis"]["tickformat"] = ".0%"
-    lay["yaxis"]["title"]     = ax_title("Change from Base Period")
-    lay["annotations"]        = [sa(f"Source: {src}", -0.28)]
-    fig.update_layout(**lay)
-
-    raw_json    = json.dumps({ind: qtr[ind] for ind in industries if ind in qtr})
-    ind_json    = json.dumps(industries)
-    colors_json = json.dumps(IND_PAL)
-
-    yr_opts  = "\n".join(f'<option value="{y}" {"selected" if y=="2019" else ""}>{y}</option>' for y in years)
-    qtr_opts = "\n".join(f'<option value="{q}" {"selected" if q=="Q1" else ""}>{q}</option>' for q in quarters)
-
-    chart_html = to_html(fig, "gdp_ind_growth")
-
-    widget = f"""
-<div class="index-selector" id="gdp_ind_controls">
-  <span class="index-label">Indexed to:</span>
-  <select class="index-select" id="gdp_ind_year">{yr_opts}</select>
-  <select class="index-select" id="gdp_ind_qtr">{qtr_opts}</select>
-</div>
-{chart_html}
-<script>
-(function(){{
-  var raw       = {raw_json};
-  var industries = {ind_json};
-  var palette   = {colors_json};
-
-  function reindex(refStr) {{
     var yArrays = [];
-    industries.forEach(function(ind) {{
-      if (!raw[ind]) {{ yArrays.push([]); return; }}
-      var times = raw[ind].times;
-      var vals  = raw[ind].values;
-      var ri    = times.indexOf(refStr);
-      if (ri < 0) ri = 0;
-      var ref = vals[ri];
+    states.forEach(function(state) {{
+      if (!raw[state]) {{ yArrays.push([]); return; }}
+      var vals = raw[state];
+      var ref  = vals[refIdx];
       if (!ref || isNaN(ref)) {{ yArrays.push(vals.map(function(){{return null;}})); return; }}
       yArrays.push(vals.map(function(v){{ return (v/ref)-1; }}));
     }});
-    var traces = industries.map(function(_,i){{return i;}});
-    Plotly.restyle('gdp_ind_growth', {{y: yArrays}}, traces);
+    var traces = states.map(function(_,i){{return i;}});
+    Plotly.restyle('gdp_ny_us_index', {{y: yArrays}}, traces);
   }}
 
   function update() {{
-    var yr  = document.getElementById('gdp_ind_year').value;
-    var qtr = document.getElementById('gdp_ind_qtr').value;
+    var yr  = document.getElementById('gdp_ny_us_year').value;
+    var qtr = document.getElementById('gdp_ny_us_qtr').value;
     reindex(yr + qtr);
   }}
-  document.getElementById('gdp_ind_year').addEventListener('change', update);
-  document.getElementById('gdp_ind_qtr').addEventListener('change', update);
+
+  document.getElementById('gdp_ny_us_year').addEventListener('change', update);
+  document.getElementById('gdp_ny_us_qtr').addEventListener('change', update);
 }})();
 </script>"""
     return widget
 
 def chart_gdp_industry_bar():
+    """NY GDP by industry — interactive levels chart. Total visible by default;
+    click legend entries to add individual industries."""
     data = load("bea_gdp_industry")
     if not data: return "<p>GDP industry data unavailable.</p>"
-    ann = data.get("annual_by_industry", {})
-    if not ann or "data" not in ann: return "<p>GDP industry annual data unavailable.</p>"
-    year = ann.get("year","")
-    rows = [r for r in ann["data"] if r.get("DataValue") is not None]
-    if not rows: return "<p>No industry GDP data.</p>"
-    df = pd.DataFrame(rows)
-    df["DataValue"] = pd.to_numeric(df["DataValue"], errors="coerce")
-    df = df.dropna(subset=["DataValue"]).sort_values("DataValue", ascending=True)
-    mx = df["DataValue"].max()
-    df["color"] = df["DataValue"].map(
-        lambda v: NY_RUST if v/mx > 0.5 else (TAN if v/mx > 0.2 else DUSTY))
-    df["label"] = df.apply(
-        lambda r: f"${r['DataValue']:,.0f}M  {r['share']:.1%}" if pd.notna(r.get("share")) else f"${r['DataValue']:,.0f}M", axis=1)
-    fig = go.Figure(go.Bar(
-        x=df["DataValue"], y=df["industry"], orientation="h",
-        text=df["label"], textposition="inside",
-        textfont=dict(size=9, color=WHITE),
-        marker_color=df["color"],
-        hovertemplate="%{y}: $%{x:,.0f}M<extra></extra>"))
-    lay = L(f"New York GDP by Industry — {year}", h=560, bm=70)
-    lay["legend"]         = dict(orientation="h", y=-0.07, xanchor="center", x=0.5)
-    lay["hovermode"]      = "y unified"
-    lay["xaxis"]["title"] = ax_title("Real GDP (Millions USD, Chained 2017 $)")
-    lay["yaxis"]["title"] = ""
-    lay["annotations"]    = [sa("Source: U.S. Bureau of Economic Analysis, SAGDP9N", -0.12)]
+    qtr = data.get("quarterly_by_industry", {})
+    if not qtr: return "<p>GDP quarterly industry data unavailable.</p>"
+
+    src       = "U.S. Bureau of Economic Analysis, Real GDP (SQGDP9)"
+    total_key = "All industry total"
+
+    # Sub-components of already-included aggregates — skip to avoid double-counting
+    skip = {
+        "Private industries",
+        "Durable goods manufacturing",
+        "Nondurable goods manufacturing",
+        "Federal civilian",
+        "Military",
+        "State and local",
+    }
+
+    industry_keys = [k for k in qtr.keys() if k != total_key and k not in skip]
+
+    # Sort by latest value descending for a logical legend order
+    def latest_val(k):
+        v = qtr[k]["values"]
+        return v[-1] if v else 0
+    industry_keys = sorted(industry_keys, key=latest_val, reverse=True)
+
+    # Build total lookup for % computation
+    total_map = {}
+    if total_key in qtr:
+        total_map = dict(zip(qtr[total_key]["times"], qtr[total_key]["values"]))
+
+    fig = go.Figure()
+
+    # "All industry total" trace — visible by default
+    if total_key in qtr:
+        td = qtr[total_key]
+        fig.add_trace(go.Scatter(
+            x=td["times"], y=td["values"],
+            name="All Industries",
+            visible=True,
+            line=dict(color=NY_RUST, width=2.5),
+            hovertemplate="All Industries: $%{y:,.0f}M (100%)<extra></extra>",
+        ))
+    elif industry_keys:
+        # Fallback: show highest-GDP industry if total unavailable
+        k0 = industry_keys[0]
+        td = qtr[k0]
+        fig.add_trace(go.Scatter(
+            x=td["times"], y=td["values"],
+            name=k0,
+            visible=True,
+            line=dict(color=NY_RUST, width=2.5),
+            hovertemplate=f"{k0}: $%{{y:,.0f}}M<extra></extra>",
+        ))
+        industry_keys = industry_keys[1:]
+
+    # Individual industry traces — legendonly until clicked
+    for i, ind in enumerate(industry_keys):
+        sd         = qtr[ind]
+        times_list = sd["times"]
+        vals_raw   = sd["values"]
+
+        pct_list = []
+        for t, v in zip(times_list, vals_raw):
+            tot = total_map.get(t)
+            pct_list.append(round(v / tot * 100, 1) if tot and tot > 0 else None)
+
+        has_pct    = bool(total_map)
+        color      = IND_PAL[i % len(IND_PAL)]
+
+        if has_pct:
+            ht     = f"{ind}: $%{{y:,.0f}}M (%{{customdata[0]:.1f}}%)<extra></extra>"
+            cdata  = [[p] for p in pct_list]
+            fig.add_trace(go.Scatter(
+                x=times_list, y=vals_raw,
+                name=ind, visible="legendonly",
+                line=dict(color=color, width=1.8),
+                customdata=cdata,
+                hovertemplate=ht,
+            ))
+        else:
+            fig.add_trace(go.Scatter(
+                x=times_list, y=vals_raw,
+                name=ind, visible="legendonly",
+                line=dict(color=color, width=1.8),
+                hovertemplate=f"{ind}: $%{{y:,.0f}}M<extra></extra>",
+            ))
+
+    lay = L("New York GDP by Industry", h=600, bm=200)
+    lay["legend"] = dict(
+        orientation="h", yanchor="top", y=-0.22,
+        xanchor="center", x=0.5,
+        font=dict(size=9, color=TEXT_MID),
+        bgcolor="rgba(0,0,0,0)", borderwidth=0,
+        entrywidth=190, entrywidthmode="pixels",
+        itemclick="toggle",
+        itemdoubleclick="toggleothers",
+    )
+    lay["xaxis"]["title"]      = ax_title("Quarterly")
+    lay["yaxis"]["title"]      = ax_title("Real GDP (Millions of Chained 2017 $)")
+    lay["yaxis"]["tickformat"] = ",.0f"
+    lay["annotations"]         = [sa(f"Source: {src}", -0.34)]
     fig.update_layout(**lay)
-    return to_html(fig, "gdp_bar")
+    return to_html(fig, "gdp_ind_levels")
 
 
 # ══ HOUSING ═══════════════════════════════════════════════════════════════════
