@@ -802,7 +802,7 @@ def build():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>New York State Economic Dashboard</title>
+<title>New York State Economic Dashboard - DRAFT - CENSUS API DOWN AS OF 11AM 4/21</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
   :root {{
@@ -874,7 +874,7 @@ def build():
 </head>
 <body>
 <header>
-  <div class="site-title"><span>NY</span> Economic Dashboard</div>
+  <div class="site-title"><span>NY</span> Economic Dashboard &mdash; DRAFT &mdash; CENSUS API DOWN AS OF 11AM 4/21</div>
   <div class="updated">Updated {updated}</div>
 </header>
 <nav>
